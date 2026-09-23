@@ -53,13 +53,13 @@ class TestDiscovery:
         assert Command()._discover_builders() == []
 
     @override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures_mixed"])
-    def test_ignores_the_base_class(self) -> None:
+    def test_returns_builders_in_definition_order(self) -> None:
         builders = [builder for _, builder in Command()._discover_builders()]
         assert builders == [
+            fixtures_mixed.Succeeds,
             fixtures_mixed.FailsAssertion,
             fixtures_mixed.Raises,
             fixtures_mixed.Skipped,
-            fixtures_mixed.Succeeds,
         ]
 
 

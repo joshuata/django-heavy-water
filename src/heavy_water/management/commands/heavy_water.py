@@ -1,5 +1,5 @@
 from importlib import import_module
-from inspect import getmembers, isabstract, isclass
+from inspect import isabstract, isclass
 from traceback import format_exception
 from typing import Any
 
@@ -83,7 +83,8 @@ class Command(FlushCommand):
                 if not module_has_submodule(app.module, module_name):
                     continue
                 module = import_module(f"{app.name}.{module_name}")
-                for _, member in getmembers(module):
+                # vars() keeps definition order, so builders run in the order written.
+                for member in vars(module).values():
                     # Only concrete builders defined here: imported builders run
                     # from their own module, and abstract bases (including
                     # BaseDataBuilder) can't be instantiated.

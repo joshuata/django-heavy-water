@@ -66,6 +66,7 @@ Widget.objects.using(self.database).get_or_create(name="Sprocket")
 ### How builders run
 
 - The command runs every builder it finds whose `should_run()` returns `True`. By default it always does; override it to limit a builder to certain environments, as in the example above. `should_run()` receives the command's arguments and parsed options (such as `wipe` and `verbosity`), so you can use them as conditions too, for example `return options["wipe"]`.
+- Builders run in the order they're defined in each module. Apps are processed in `INSTALLED_APPS` order, and modules in `HEAVY_WATER_FIXTURE_MODULE` order.
 - All builders run in one transaction, and each builder gets its own savepoint. If a builder raises, only its changes are rolled back and the other builders still run.
 - If any builder failed, the command exits with an error listing them after committing the rest.
 
