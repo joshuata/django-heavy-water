@@ -1,5 +1,5 @@
 from importlib import import_module
-from inspect import getmembers, isclass
+from inspect import getmembers, isabstract, isclass
 from traceback import format_exception
 from typing import Any
 
@@ -84,10 +84,14 @@ class Command(FlushCommand):
                     continue
                 module = import_module(f"{app.name}.{module_name}")
                 for _, member in getmembers(module):
+                    # Only concrete builders defined here: imported builders run
+                    # from their own module, and abstract bases (including
+                    # BaseDataBuilder) can't be instantiated.
                     if (
                         isclass(member)
                         and issubclass(member, BaseDataBuilder)
-                        and not member == BaseDataBuilder
+                        and member.__module__ == module.__name__
+                        and not isabstract(member)
                     ):
                         data_builders.append((app.name, member))
 

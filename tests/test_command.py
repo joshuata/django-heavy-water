@@ -6,7 +6,7 @@ from django.core.management import CommandError, call_command
 from django.test import override_settings
 
 from heavy_water.management.commands.heavy_water import Command
-from tests.testapp import fixtures, fixtures_mixed, fixtures_options
+from tests.testapp import fixtures, fixtures_mixed, fixtures_options, fixtures_scope
 from tests.testapp.models import Record
 
 pytestmark = pytest.mark.django_db
@@ -31,6 +31,21 @@ class TestDiscovery:
         assert Command()._discover_builders() == [
             ("tests.testapp", fixtures.Basic),
             ("tests.testapp", fixtures_options.WipeOnly),
+        ]
+
+    @override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures_scope"])
+    def test_ignores_imported_and_abstract_builders(self) -> None:
+        assert Command()._discover_builders() == [
+            ("tests.testapp", fixtures_scope.UsesSharedBase)
+        ]
+
+    @override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures", "fixtures_scope"])
+    def test_imported_builder_runs_once(self) -> None:
+        run()
+
+        assert sorted(Record.objects.values_list("name", flat=True)) == [
+            "basic",
+            "uses-shared-base",
         ]
 
     @override_settings(HEAVY_WATER_FIXTURE_MODULE=["does_not_exist"])
