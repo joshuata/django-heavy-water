@@ -114,7 +114,7 @@ The command prints with [Rich](https://rich.readthedocs.io/) via [django-rich](h
 self.console.print(f"Created [bold]{count}[/] widgets")
 ```
 
-`self.stdout`, `self.stderr` and `self.style` still work but are deprecated, and raise `heavy_water.HeavyWaterDeprecationWarning` (a `FutureWarning`, which Python shows by default) when used. heavy_water also adds a system check, so you find out before running anything: `manage.py check` (and most other commands) reports `heavy_water.W001` for each builder whose source uses them. Use `self.console`, `self.err_console` and Rich markup instead.
+`self.stdout`, `self.stderr` and `self.style` still work but are deprecated, and raise `heavy_water.HeavyWaterDeprecationWarning` (a `FutureWarning`, which Python shows by default) when used. heavy_water also adds a system check, so you find out before any builder runs: `manage.py heavy_water` (including `--list`) reports `heavy_water.W001` for each builder whose source uses them. The check only runs for the `heavy_water` command, so other commands like `runserver` don't import your fixtures modules. Use `self.console`, `self.err_console` and Rich markup instead.
 
 To silence the check, add `"heavy_water.W001"` to `SILENCED_SYSTEM_CHECKS`.
 

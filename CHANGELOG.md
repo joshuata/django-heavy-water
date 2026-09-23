@@ -4,15 +4,15 @@ All notable changes to django-heavy-water. The format follows [Keep a Changelog]
 
 ## Unreleased
 
+### Changed
+
+- The `heavy_water.W001` system check now runs only before the `heavy_water` command, not before every command. It imports every fixtures module, which slowed down commands like `runserver` and ran any import-time code in those modules. `manage.py check` no longer reports it; run `manage.py heavy_water --list` instead.
+- Development only: CI measures test coverage (100% of lines and branches, enforced), uploads it to Codecov, and type-checks the tests. Test results appear on each CI job's summary page, and mypy errors are annotated on pull requests.
+- Development only: GitHub Actions are pinned to commit SHAs (checked by pinact in `mise run lint`), and Renovate keeps actions, tools and dependencies up to date.
+
 ### Fixed
 
 - `--list` wraps long lines instead of cutting them off at the terminal width, which could hide why a builder is skipped.
-
-### Changed
-
-- Development only: CI measures test coverage (100% of lines and branches, enforced), uploads it to Codecov, and type-checks the tests. Test results appear on each CI job's summary page, and mypy errors are annotated on pull requests.
-
-- Development only: GitHub Actions are pinned to commit SHAs (checked by pinact in `mise run lint`), and Renovate keeps actions, tools and dependencies up to date.
 
 ## 0.3.0 - 2026-09-23
 

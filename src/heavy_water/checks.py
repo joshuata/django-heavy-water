@@ -1,4 +1,9 @@
-"""System checks for data builders."""
+"""System checks for data builders.
+
+They're registered by the ``heavy_water`` command module, not when the app loads,
+because they import every fixtures module: Django only imports that module to run
+``heavy_water``, so other commands (``runserver``, ``migrate``...) don't pay for it.
+"""
 
 from __future__ import annotations
 
@@ -39,7 +44,6 @@ def _deprecated_uses(cls: type) -> list[str]:
     return sorted(found)
 
 
-@checks.register()
 def check_deprecated_output(
     app_configs: Sequence[AppConfig] | None, **kwargs: Any
 ) -> list[checks.CheckMessage]:

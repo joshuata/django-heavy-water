@@ -2,6 +2,7 @@ import sys
 from typing import Any, Literal
 
 from django.conf import settings
+from django.core import checks
 from django.core.management.base import CommandError, CommandParser
 from django.core.management.commands.flush import Command as FlushCommand
 from django.db import transaction
@@ -11,6 +12,7 @@ from rich.markup import escape
 from rich.tree import Tree
 
 from heavy_water import BaseDataBuilder
+from heavy_water.checks import check_deprecated_output
 from heavy_water.conf import app_settings
 from heavy_water.discovery import (
     BuilderEntry,
@@ -21,6 +23,10 @@ from heavy_water.discovery import (
 )
 
 Result = Literal["ran", "skipped", "failed"]
+
+# Registered here rather than in AppConfig.ready(), so only this command runs it
+# (Django runs a command's system checks after importing its module).
+checks.register(check_deprecated_output, "heavy_water")
 
 
 class Command(RichCommand, FlushCommand):
