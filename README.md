@@ -1,16 +1,28 @@
 # django-heavy-water
 
+[![PyPI](https://img.shields.io/pypi/v/django-heavy-water)](https://pypi.org/project/django-heavy-water/)
+[![Python versions](https://img.shields.io/pypi/pyversions/django-heavy-water)](https://pypi.org/project/django-heavy-water/)
+[![CI](https://github.com/joshuata/django-heavy-water/actions/workflows/ci.yml/badge.svg)](https://github.com/joshuata/django-heavy-water/actions/workflows/ci.yml)
+
 A reusable Django app that seeds your database with development and test data. Each app in your project defines *data builders*, and a single management command, `heavy_water`, runs the ones that apply to the current environment.
 
 Requires Python 3.10+ and Django 4.2+.
 
 ## Installation
 
-The package isn't on PyPI yet, so install it from GitHub:
+Install [django-heavy-water from PyPI](https://pypi.org/project/django-heavy-water/):
 
 ```sh
-pip install git+https://github.com/joshuata/django-heavy-water
+pip install django-heavy-water
 ```
+
+Or, with uv:
+
+```sh
+uv add django-heavy-water
+```
+
+Release notes and upgrade instructions are in the [changelog](https://github.com/joshuata/django-heavy-water/blob/main/CHANGELOG.md).
 
 Add it to `INSTALLED_APPS`:
 
@@ -200,7 +212,7 @@ GitHub Actions (`.github/workflows/`) runs everything through the same mise task
 
 To release:
 
-1. Make sure [CHANGELOG.md](CHANGELOG.md) lists the changes under `## Unreleased`, including upgrade notes for anything that breaks existing projects.
+1. Make sure [CHANGELOG.md](https://github.com/joshuata/django-heavy-water/blob/main/CHANGELOG.md) lists the changes under `## Unreleased`, including upgrade notes for anything that breaks existing projects.
 2. Commit everything that's part of the release; `bump` refuses to run with uncommitted changes.
 3. Run `mise run bump` (or `bump minor` / `bump major`). It bumps the version, moves the Unreleased changes under a dated heading for the new version, commits, and tags.
 4. Push with `git push --follow-tags`, and publish a GitHub release from the new tag.
@@ -209,4 +221,4 @@ The package ships a `py.typed` marker and is checked with mypy in strict mode, s
 
 ## License
 
-BSD 3-Clause. See [LICENSE](LICENSE).
+BSD 3-Clause. See [LICENSE](https://github.com/joshuata/django-heavy-water/blob/main/LICENSE).
