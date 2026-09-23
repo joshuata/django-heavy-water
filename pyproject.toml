@@ -40,7 +40,13 @@ Repository = "https://github.com/joshuata/django-heavy-water"
 Issues = "https://github.com/joshuata/django-heavy-water/issues"
 
 [dependency-groups]
-dev = ["mypy", "django-stubs", "pytest", "pytest-django"]
+dev = [
+    "mypy",
+    "django-stubs",
+    "pytest",
+    "pytest-django",
+    "ruff~=0.16.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]
