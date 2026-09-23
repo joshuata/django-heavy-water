@@ -4,6 +4,7 @@ from typing import Any
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import OutputWrapper
 from django.core.management.color import no_style
 from django.test import override_settings
@@ -11,6 +12,12 @@ from django.test import override_settings
 from tests.testapp.fixtures import Basic
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def debug(settings: Any) -> None:
+    # The default password is only allowed in development.
+    settings.DEBUG = True
 
 
 @pytest.fixture
@@ -113,6 +120,37 @@ def test_builder_database_defaults_to_the_setting(
 
     assert builder.database == "default"
     assert fresh.database == "other"
+
+
+class TestDefaultPasswordOutsideDebug:
+    @pytest.fixture(autouse=True)
+    def debug(self, settings: Any) -> None:
+        settings.DEBUG = False
+
+    def test_refuses_to_create_with_default_password(self, builder: Basic) -> None:
+        with pytest.raises(ImproperlyConfigured, match="default password"):
+            builder.get_or_create_superuser()
+
+        assert not get_user_model().objects.exists()
+
+    def test_allows_an_explicit_password(self, builder: Basic) -> None:
+        user = builder.get_or_create_superuser(password="s3cret")
+
+        assert user.check_password("s3cret")
+
+    def test_allows_a_password_from_settings(
+        self, builder: Basic, settings: Any
+    ) -> None:
+        settings.HEAVY_WATER_SUPERUSER_PASSWORD = "from-settings"
+
+        user = builder.get_or_create_superuser()
+
+        assert user.check_password("from-settings")
+
+    def test_returns_an_existing_user(self, builder: Basic) -> None:
+        existing = builder.get_or_create_superuser(password="s3cret")
+
+        assert builder.get_or_create_superuser().pk == existing.pk
 
 
 class TestEmailUserModel:

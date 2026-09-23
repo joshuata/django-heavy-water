@@ -104,7 +104,7 @@ self.get_or_create_superuser(
 )
 ```
 
-> **Warning:** the default password is `rootroot`. Set `HEAVY_WATER_SUPERUSER_PASSWORD` before enabling any builder that creates a superuser outside local development.
+> **Note:** the default password is `rootroot`, and it's only allowed when `DEBUG = True`. With `DEBUG = False`, creating a superuser raises `ImproperlyConfigured` unless you pass `password=` or set `HEAVY_WATER_SUPERUSER_PASSWORD`. Existing users are still returned as normal.
 
 ## Settings
 

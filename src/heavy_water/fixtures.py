@@ -9,14 +9,15 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser, AbstractUser, UserManager
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.exceptions import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.core.management.base import OutputWrapper
 from django.core.management.color import Style
 from django.db import transaction
 from django.db.models import Model
 
-from heavy_water.conf import app_settings
+from heavy_water.conf import DEFAULTS, app_settings
 
 
 def _has_field(model: type[Model], name: str) -> bool:
@@ -120,6 +121,10 @@ class BaseDataBuilder(ABC):
         ``email``, ``first_name``, ``last_name`` and ``password`` are only used
         when the user is created; an existing user is returned unchanged.
 
+        Raises:
+            ImproperlyConfigured: If a user would be created with the default
+                password while ``DEBUG`` is ``False``.
+
         Args:
             username: Value of the login field to look up or create.
             email: Email address for a new user.
@@ -151,10 +156,14 @@ class BaseDataBuilder(ABC):
         try:
             superuser = user_manager.get_by_natural_key(username)
         except user_model.DoesNotExist:
-            fields: dict[str, Any] = {
-                username_field: username,
-                "password": password or app_settings.SUPERUSER_PASSWORD,
-            }
+            password = password or app_settings.SUPERUSER_PASSWORD
+            if password == DEFAULTS["SUPERUSER_PASSWORD"] and not settings.DEBUG:
+                raise ImproperlyConfigured(
+                    "Refusing to create a superuser with the default password "
+                    "while DEBUG is False. Pass password= or set "
+                    "HEAVY_WATER_SUPERUSER_PASSWORD."
+                ) from None
+            fields: dict[str, Any] = {username_field: username, "password": password}
             optional_fields = {
                 email_field: email,
                 "first_name": first_name or app_settings.SUPERUSER_FIRST_NAME,
