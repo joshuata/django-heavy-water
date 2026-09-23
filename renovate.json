@@ -1,0 +1,46 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    "helpers:pinGitHubActionDigestsToSemver",
+    "schedule:weekly"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Group GitHub Actions updates into one PR",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "hk's pinact builtin supports pinact v3 and v4 only",
+      "matchManagers": [
+        "mise"
+      ],
+      "matchPackageNames": [
+        "pinact"
+      ],
+      "allowedVersions": "<5"
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Update the hk version in the hk.pkl package URLs",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^hk\\.pkl$/"
+      ],
+      "matchStrings": [
+        "package://github\\.com/jdx/hk/releases/download/v(?<currentValue>[^/]+)/hk@"
+      ],
+      "depNameTemplate": "jdx/hk",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    }
+  ]
+}

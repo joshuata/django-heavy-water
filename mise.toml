@@ -7,6 +7,8 @@ python.uv_venv_create_args = ['--seed']
 [tools]
 uv = "0.11"
 hk = "2"
+# Major 4: hk's pinact builtin supports v3 and v4.
+pinact = "4"
 
 # Run `uv sync` before `mise run` / `mise x` whenever pyproject.toml or uv.lock
 # changes, or .venv is missing.

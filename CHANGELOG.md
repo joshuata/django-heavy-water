@@ -4,6 +4,10 @@ All notable changes to django-heavy-water. The format follows [Keep a Changelog]
 
 ## Unreleased
 
+### Changed
+
+- Development only: GitHub Actions are pinned to commit SHAs (checked by pinact in `mise run lint`), and Renovate keeps actions, tools and dependencies up to date.
+
 ## 0.3.0 - 2026-09-23
 
 ### Upgrading from 0.2.2

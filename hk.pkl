@@ -5,6 +5,8 @@ steps {
   ["ruff"] = (Builtins.ruff) { glob = List("*.py", "*.pyi") }
   ["ruff_format"] = (Builtins.ruff_format) { glob = List("*.py", "*.pyi") }
   ["mypy"] = (Builtins.mypy) { glob = List("src/**/*.py", "src/**/*.pyi"); check = "uv run mypy {{files}}" }
+  // GitHub Actions must be pinned to commit SHAs, with the version as a comment.
+  ["pinact"] = Builtins.pinact
   ["uv_lock"] {
     glob = List("pyproject.toml", "uv.lock")
     check = "uv lock --check"

@@ -203,6 +203,12 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 The git hooks installed by `mise install` (or `mise run hooks`) enforce this: a `commit-msg` hook rejects other messages, and when git opens your editor, a `prepare-commit-msg` hook adds a short guide as comments. Git's own merge and revert messages are allowed. If you set up hooks before this was added, run `mise run hooks` again.
 
+### Dependencies and pinned actions
+
+GitHub Actions in `.github/workflows/` are pinned to full commit SHAs, with the version as a comment (`uses: actions/checkout@<sha> # v7.0.1`). `mise run lint` checks this with [pinact](https://github.com/suzuki-shunsuke/pinact); run `mise x -- pinact run` to pin a newly added action. pinact asks GitHub's API about each action, so set `GITHUB_TOKEN` (for example `GITHUB_TOKEN=$(gh auth token)`) if you hit rate limits.
+
+[Renovate](https://docs.renovatebot.com) (`renovate.json`) opens weekly pull requests to update the pinned actions, the tools in `mise.toml`, the Python dependencies and `uv.lock`, and the hk version in `hk.pkl`. It needs the [Renovate GitHub app](https://github.com/apps/renovate) installed on the repository.
+
 ### CI and releases
 
 GitHub Actions (`.github/workflows/`) runs everything through the same mise tasks:
