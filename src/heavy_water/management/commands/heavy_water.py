@@ -29,6 +29,11 @@ class Command(RichCommand, FlushCommand):
             help="Flush the database before running the builders.",
         )
         parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Run the builders, then roll back all their database changes.",
+        )
+        parser.add_argument(
             "--list",
             action="store_true",
             help="List the builders in the order they would run, without running them.",
@@ -56,8 +61,6 @@ class Command(RichCommand, FlushCommand):
             file=options.get("stderr") or sys.stderr,
             force_terminal=force_terminal,
         )
-        # Commit whatever succeeded before reporting failure, so a single bad
-        # builder doesn't roll back the others.
         database = options.get("database") or app_settings.DATABASE
         if database not in settings.DATABASES:
             raise CommandError(
@@ -67,8 +70,19 @@ class Command(RichCommand, FlushCommand):
         if options["list"]:
             self._list(*args, **options)
             return
+        dry_run = options["dry_run"]
+        if dry_run and options["wipe"]:
+            raise CommandError("--wipe and --dry-run can't be used together.")
+        # Commit whatever succeeded (unless this is a dry run) before reporting
+        # failure, so a single bad builder doesn't roll back the others.
         with transaction.atomic(using=database):
             failures = self._build(*args, **options)
+            if dry_run:
+                transaction.set_rollback(True, using=database)
+        if dry_run:
+            self.console.print(
+                "[yellow]Dry run: all database changes were rolled back.[/]"
+            )
         if failures:
             raise CommandError(
                 f"{len(failures)} data builder(s) failed: {', '.join(failures)}"

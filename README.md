@@ -54,6 +54,7 @@ python manage.py heavy_water          # run all builders
 python manage.py heavy_water --wipe   # flush the database first
 python manage.py heavy_water --database other   # seed a different database
 python manage.py heavy_water --list   # show what would run, without running it
+python manage.py heavy_water --dry-run   # run everything, then roll it back
 ```
 
 `--list` prints the builders as a tree in the order they would run, with each builder's dependencies under it. Builders that would be skipped are dimmed and marked "(skipped)". It calls each builder's `should_run()` (with the other options you pass, such as `--wipe`) but never runs `handle()` or flushes the database:
@@ -65,6 +66,8 @@ Data builders, in run order
 │   └── depends on 1. customers - CustomerData
 └── 3. orders - DemoData (skipped)
 ```
+
+`--dry-run` runs every builder, `handle()` included, then rolls back all their database changes, so you can check that they work without keeping the data. Failures are still reported. Anything a builder does outside the database, such as writing files or calling an API, isn't undone. It can't be combined with `--wipe`.
 
 `--wipe` uses Django's `flush` command, so it accepts `flush`'s options too, such as `--no-input`.
 
