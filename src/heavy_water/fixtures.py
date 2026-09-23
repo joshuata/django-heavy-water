@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser, AbstractUser, UserManager
@@ -44,7 +44,13 @@ class BaseDataBuilder(ABC):
             ``HEAVY_WATER_DATABASE``.
             The builder's savepoint and :meth:`get_or_create_superuser` use it;
             queries in :meth:`handle` should too, via ``.using(self.database)``.
+        depends_on: Builder classes that must run before this one. If one of
+            them fails, this builder doesn't run and is reported as failed; if
+            one is skipped, this builder is skipped too. Each must be a builder
+            the command discovers.
     """
+
+    depends_on: ClassVar[Sequence[type[BaseDataBuilder]]] = ()
 
     def __init__(
         self,

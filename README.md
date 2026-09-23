@@ -66,9 +66,30 @@ Widget.objects.using(self.database).get_or_create(name="Sprocket")
 ### How builders run
 
 - The command runs every builder it finds whose `should_run()` returns `True`. By default it always does; override it to limit a builder to certain environments, as in the example above. `should_run()` receives the command's arguments and parsed options (such as `wipe` and `verbosity`), so you can use them as conditions too, for example `return options["wipe"]`.
-- Builders run in the order they're defined in each module. Apps are processed in `INSTALLED_APPS` order, and modules in `HEAVY_WATER_FIXTURE_MODULE` order.
+- Builders run in the order they're defined in each module. Apps are processed in `INSTALLED_APPS` order, and modules in `HEAVY_WATER_FIXTURE_MODULE` order. Use `depends_on` (below) when a builder needs another one to run first.
 - All builders run in one transaction, and each builder gets its own savepoint. If a builder raises, only its changes are rolled back and the other builders still run.
 - If any builder failed, the command exits with an error listing them after committing the rest.
+
+### Dependencies between builders
+
+List the builders a builder relies on in `depends_on`. They run before it, even if they're defined later or in another app:
+
+```python
+from otherapp.fixtures import CustomerData
+
+
+class OrderData(BaseDataBuilder):
+    depends_on = (CustomerData,)
+
+    def handle(self) -> None:
+        ...
+```
+
+- If a dependency fails, the builder doesn't run and is reported as failed too.
+- If a dependency is skipped by its `should_run()`, the builder is skipped too.
+- Each dependency must be a builder the command discovers. A missing dependency or a dependency cycle stops the command before anything runs, including `--wipe`.
+
+Importing a builder into your fixtures module doesn't make it run twice: builders only run from the module that defines them.
 
 ### Creating a superuser
 
