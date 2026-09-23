@@ -151,14 +151,15 @@ All settings are optional.
 
 ## Development
 
-Development tooling is managed by [mise](https://mise.jdx.dev). It installs [uv](https://docs.astral.sh/uv/), [ruff](https://docs.astral.sh/ruff/) and [hk](https://hk.jdx.dev), and activates the project's `.venv`. Every development script is a mise task, so run everything through `mise run`.
+Development tooling is managed by [mise](https://mise.jdx.dev). It installs [uv](https://docs.astral.sh/uv/) and [hk](https://hk.jdx.dev), and activates the project's `.venv`. uv installs the Python dev tools, including [ruff](https://docs.astral.sh/ruff/), into `.venv`. Every development script is a mise task, so run everything through `mise run`.
 
 First-time setup:
 
 ```sh
-mise install     # install uv, ruff and hk
-mise run setup   # create .venv with dev dependencies and install the pre-commit hook
+mise install     # install uv and hk, and the pre-commit hook
 ```
+
+That's all: the first `mise run` or `mise x` creates `.venv` with `uv sync`, and mise re-syncs it automatically whenever `pyproject.toml` or `uv.lock` changes (via [`mise deps`](https://mise.jdx.dev/dev-tools/deps.html), an experimental mise feature this project enables). `mise run setup` does both steps explicitly.
 
 Tasks:
 
@@ -167,7 +168,7 @@ Tasks:
 | `mise run setup` | Runs `sync` and `hooks`. |
 | `mise run sync` | Installs the package and dev dependencies into `.venv`. |
 | `mise run hooks` | Installs the hk pre-commit hook. |
-| `mise run lint` | Runs all checks: ruff lint, ruff format, mypy and `uv lock --check`. The pre-commit hook runs the same checks. |
+| `mise run lint` | Syncs `.venv`, then runs all checks: ruff lint, ruff format, mypy and `uv lock --check`. The pre-commit hook runs the same checks. |
 | `mise run fix` | Applies ruff fixes and formatting, and updates `uv.lock`. |
 | `mise run test` | Runs the test suite with pytest. |
 | `DJANGO=5.2 mise run test-django` | Runs the tests against another Django version. Set `UV_PYTHON` to pick the Python version too. |

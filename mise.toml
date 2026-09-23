@@ -1,11 +1,17 @@
 [settings]
+# Needed for [deps].
+experimental = true
 python.uv_venv_auto = "create|source"
 python.uv_venv_create_args = ['--seed']
 
 [tools]
 uv = "0.11"
-ruff = "0.16"
 hk = "2"
+
+# Run `uv sync` before `mise run` / `mise x` whenever pyproject.toml or uv.lock
+# changes, or .venv is missing.
+[deps.uv]
+auto = true
 
 [env]
 _.python.venv = { path = ".venv", create = false }
