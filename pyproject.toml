@@ -16,8 +16,6 @@ classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",
     "Framework :: Django :: 4.2",
-    "Framework :: Django :: 5.0",
-    "Framework :: Django :: 5.1",
     "Framework :: Django :: 5.2",
     "Framework :: Django :: 6.0",
     "Framework :: Django :: 6.1",
@@ -70,6 +68,8 @@ ignore = ["E501", "TD003"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tests.settings"
+# Run like a development environment: builders only run by default when DEBUG is on.
+django_debug_mode = true
 pythonpath = ["."]
 testpaths = ["tests"]
 # Our own code must never use deprecated builder attributes.

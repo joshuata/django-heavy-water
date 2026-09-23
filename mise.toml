@@ -78,8 +78,9 @@ set -euo pipefail
 
 part="${usage_part:-patch}"
 
-if ! git diff --quiet HEAD -- pyproject.toml uv.lock CHANGELOG.md; then
-  echo "pyproject.toml, uv.lock or CHANGELOG.md has uncommitted changes; commit or stash them first." >&2
+# The tag must point at the code being released, so nothing tracked may be uncommitted.
+if ! git diff --quiet HEAD; then
+  echo "There are uncommitted changes; commit or stash them before releasing." >&2
   exit 1
 fi
 if ! grep -qx "## Unreleased" CHANGELOG.md; then

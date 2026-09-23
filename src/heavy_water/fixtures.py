@@ -229,12 +229,13 @@ class BaseDataBuilder(ABC):
     def should_run(self, *args: Any, **options: Any) -> bool:
         """Return whether this builder should run in the current environment.
 
-        Runs every time by default. Override it to limit the builder, for example
-        ``return settings.DEBUG``.
+        By default, only when ``DEBUG`` is ``True``, so seed data doesn't reach
+        production by accident. Override it to run elsewhere, for example
+        ``return True`` for data every environment needs.
 
         Args:
             *args: Positional arguments passed to the ``heavy_water`` command.
             **options: The command's parsed options, such as ``wipe``,
                 ``verbosity`` and ``database``.
         """
-        return True
+        return bool(settings.DEBUG)

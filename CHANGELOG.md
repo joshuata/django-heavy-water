@@ -4,7 +4,13 @@ All notable changes to django-heavy-water. The format follows [Keep a Changelog]
 
 ## Unreleased
 
+### Upgrading from 0.2.2
+
+- **Builders only run when `DEBUG` is `True` by default.** `BaseDataBuilder.should_run()` now returns `settings.DEBUG` instead of `True`, so seed data doesn't reach staging or production by accident. For a builder that should run everywhere, override `should_run()` to `return True`. Builders that already override `should_run()` are unaffected. Run `manage.py heavy_water --list` in each environment to check what will run.
+
 ### Changed
+
+- The package no longer claims support for Django 5.0 and 5.1, which have reached end of life and aren't tested. Django 4.2 and later are still allowed.
 
 - Development only: ruff is installed as a dev dependency instead of by mise, and mise re-syncs `.venv` automatically when `pyproject.toml` or `uv.lock` change.
 - Development only: commit messages must follow Conventional Commits, enforced by a `commit-msg` hook.

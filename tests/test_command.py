@@ -165,3 +165,12 @@ class TestDatabaseOption:
     def test_unknown_database_is_an_error(self) -> None:
         with pytest.raises(CommandError, match="Unknown database 'missing'"):
             run(database="missing")
+
+
+def test_builders_are_skipped_when_debug_is_off(settings: Any) -> None:
+    settings.DEBUG = False
+
+    stdout, _ = run()
+
+    assert "tests.testapp - Basic: Skipped" in stdout
+    assert not Record.objects.exists()

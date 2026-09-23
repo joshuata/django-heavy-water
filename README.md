@@ -31,20 +31,25 @@ Create a `fixtures.py` module in any installed app and subclass `BaseDataBuilder
 # myapp/fixtures.py
 from typing import Any
 
-from django.conf import settings
-
 from heavy_water import BaseDataBuilder
 
-from myapp.models import Widget
+from myapp.models import Category, Widget
 
 
 class WidgetData(BaseDataBuilder):
-    def should_run(self, *args: Any, **options: Any) -> bool:
-        return settings.DEBUG
-
+    # Runs only when DEBUG is True (the default).
     def handle(self) -> None:
         self.get_or_create_superuser()
         Widget.objects.get_or_create(name="Sprocket")
+
+
+class CategoryData(BaseDataBuilder):
+    # Data every environment needs, so run it everywhere.
+    def should_run(self, *args: Any, **options: Any) -> bool:
+        return True
+
+    def handle(self) -> None:
+        Category.objects.get_or_create(name="General")
 ```
 
 ### Run it
@@ -83,7 +88,7 @@ Widget.objects.using(self.database).get_or_create(name="Sprocket")
 
 ### How builders run
 
-- The command runs every builder it finds whose `should_run()` returns `True`. By default it always does; override it to limit a builder to certain environments, as in the example above. `should_run()` receives the command's arguments and parsed options (such as `wipe` and `verbosity`), so you can use them as conditions too, for example `return options["wipe"]`.
+- The command runs every builder it finds whose `should_run()` returns `True`. By default that's only when `DEBUG` is `True`, so seed data doesn't reach production by accident. Override it to run a builder elsewhere, as `CategoryData` does above. `should_run()` receives the command's arguments and parsed options (such as `wipe` and `verbosity`), so you can use them as conditions too, for example `return options["wipe"]`.
 - Builders run in the order they're defined in each module. Apps are processed in `INSTALLED_APPS` order, and modules in `HEAVY_WATER_FIXTURE_MODULE` order. Use `depends_on` (below) when a builder needs another one to run first.
 - All builders run in one transaction, and each builder gets its own savepoint. If a builder raises, only its changes are rolled back and the other builders still run.
 - If any builder failed, the command exits with an error listing them after committing the rest.
@@ -196,8 +201,9 @@ GitHub Actions (`.github/workflows/`) runs everything through the same mise task
 To release:
 
 1. Make sure [CHANGELOG.md](CHANGELOG.md) lists the changes under `## Unreleased`, including upgrade notes for anything that breaks existing projects.
-2. Run `mise run bump` (or `bump minor` / `bump major`). It bumps the version, moves the Unreleased changes under a dated heading for the new version, commits, and tags.
-3. Push with `git push --follow-tags`, and publish a GitHub release from the new tag.
+2. Commit everything that's part of the release; `bump` refuses to run with uncommitted changes.
+3. Run `mise run bump` (or `bump minor` / `bump major`). It bumps the version, moves the Unreleased changes under a dated heading for the new version, commits, and tags.
+4. Push with `git push --follow-tags`, and publish a GitHub release from the new tag.
 
 The package ships a `py.typed` marker and is checked with mypy in strict mode, so new code must be fully type-annotated.
 
