@@ -1,6 +1,7 @@
 import sys
 from typing import Any, Literal
 
+from django.apps import apps
 from django.conf import settings
 from django.core.management.base import CommandError, CommandParser
 from django.core.management.commands.flush import Command as FlushCommand
@@ -27,6 +28,20 @@ class Command(RichCommand, FlushCommand):
             "--wipe",
             action="store_true",
             help="Flush the database before running the builders.",
+        )
+        parser.add_argument(
+            "--only",
+            action="append",
+            default=[],
+            metavar="APP_LABEL[.BUILDER]",
+            help="Run only these builders (and their dependencies). Repeatable.",
+        )
+        parser.add_argument(
+            "--exclude",
+            action="append",
+            default=[],
+            metavar="APP_LABEL[.BUILDER]",
+            help="Don't run these builders, or builders that depend on them. Repeatable.",
         )
         parser.add_argument(
             "--dry-run",
@@ -90,7 +105,7 @@ class Command(RichCommand, FlushCommand):
 
     def _build(self, *args: Any, **options: Any) -> list[str]:
         # Order first, so a dependency error stops the command before --wipe.
-        builders = self._order_builders(self._discover_builders())
+        builders = self._selected_builders(**options)
         if options.get("wipe"):
             super().handle(*args, **options)
 
@@ -149,7 +164,7 @@ class Command(RichCommand, FlushCommand):
 
     def _list(self, *args: Any, **options: Any) -> None:
         """Print the builders as a tree in run order, with their dependencies."""
-        builders = self._order_builders(self._discover_builders())
+        builders = self._selected_builders(**options)
         if not builders:
             self.console.print("No data builders found.")
             return
@@ -187,6 +202,61 @@ class Command(RichCommand, FlushCommand):
         except Exception as ex:
             return f"skipped, should_run() raised {ex!r}"
         return None
+
+    def _selected_builders(
+        self, **options: Any
+    ) -> list[tuple[str, type[BaseDataBuilder]]]:
+        """Return the builders to run, in order, after ``--only`` and ``--exclude``."""
+        builders = all_builders = self._order_builders(self._discover_builders())
+        only: list[str] = options.get("only") or []
+        exclude: list[str] = options.get("exclude") or []
+
+        if only:
+            keep: set[type[BaseDataBuilder]] = set()
+            pending = [b for spec in only for b in self._match(spec, all_builders)]
+            while pending:
+                builder = pending.pop()
+                if builder not in keep:
+                    keep.add(builder)
+                    pending.extend(builder.depends_on)
+            builders = [entry for entry in builders if entry[1] in keep]
+
+        if exclude:
+            dropped = {b for spec in exclude for b in self._match(spec, all_builders)}
+            # Dependencies come first in run order, so one pass finds every
+            # builder that depends, directly or not, on an excluded one.
+            for app_name, builder in builders:
+                deps = [dep for dep in builder.depends_on if dep in dropped]
+                if builder not in dropped and deps:
+                    dropped.add(builder)
+                    names = escape(", ".join(dep.__name__ for dep in deps))
+                    self.console.print(
+                        f"[dim]{escape(f'{app_name} - {builder.__name__}')}: "
+                        f"Excluded, it depends on {names}[/]"
+                    )
+            builders = [entry for entry in builders if entry[1] not in dropped]
+
+        return builders
+
+    def _match(
+        self, spec: str, builders: list[tuple[str, type[BaseDataBuilder]]]
+    ) -> list[type[BaseDataBuilder]]:
+        """Return the builders matching ``app_label`` or ``app_label.BuilderName``."""
+        label, _, name = spec.partition(".")
+        try:
+            app_name = apps.get_app_config(label).name
+        except LookupError:
+            raise CommandError(
+                f"No installed app with label {label!r} ({spec!r})."
+            ) from None
+        matches = [
+            builder
+            for builder_app, builder in builders
+            if builder_app == app_name and (not name or builder.__name__ == name)
+        ]
+        if not matches:
+            raise CommandError(f"{spec!r} doesn't match any data builders.")
+        return matches
 
     def _order_builders(
         self, builders: list[tuple[str, type[BaseDataBuilder]]]

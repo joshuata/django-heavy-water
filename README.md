@@ -55,6 +55,8 @@ python manage.py heavy_water --wipe   # flush the database first
 python manage.py heavy_water --database other   # seed a different database
 python manage.py heavy_water --list   # show what would run, without running it
 python manage.py heavy_water --dry-run   # run everything, then roll it back
+python manage.py heavy_water --only orders.OrderData   # run one builder (plus its dependencies)
+python manage.py heavy_water --exclude orders   # skip every builder in an app
 ```
 
 `--list` prints the builders as a tree in the order they would run, with each builder's dependencies under it. Builders that would be skipped are dimmed and marked "(skipped)". It calls each builder's `should_run()` (with the other options you pass, such as `--wipe`) but never runs `handle()` or flushes the database:
@@ -68,6 +70,8 @@ Data builders, in run order
 ```
 
 `--dry-run` runs every builder, `handle()` included, then rolls back all their database changes, so you can check that they work without keeping the data. Failures are still reported. Anything a builder does outside the database, such as writing files or calling an API, isn't undone. It can't be combined with `--wipe`.
+
+`--only` and `--exclude` take an app label (`orders`) or an app label and builder class name (`orders.OrderData`), and can be repeated. `--only` also runs the selected builders' dependencies, and `--exclude` also drops builders that depend on an excluded one. `--exclude` applies after `--only`. Both work with `--list` and `--dry-run`.
 
 `--wipe` uses Django's `flush` command, so it accepts `flush`'s options too, such as `--no-input`.
 
