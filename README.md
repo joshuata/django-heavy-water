@@ -53,7 +53,25 @@ class WidgetData(BaseDataBuilder):
 python manage.py heavy_water          # run all builders
 python manage.py heavy_water --wipe   # flush the database first
 python manage.py heavy_water --database other   # seed a different database
+python manage.py heavy_water --list   # show what would run, without running it
+python manage.py heavy_water --dry-run   # run everything, then roll it back
+python manage.py heavy_water --only orders.OrderData   # run one builder (plus its dependencies)
+python manage.py heavy_water --exclude orders   # skip every builder in an app
 ```
+
+`--list` prints the builders as a tree in the order they would run, with each builder's dependencies under it. Builders that would be skipped are dimmed and marked "(skipped)". It calls each builder's `should_run()` (with the other options you pass, such as `--wipe`) but never runs `handle()` or flushes the database:
+
+```
+Data builders, in run order
+├── 1. customers - CustomerData
+├── 2. orders - OrderData
+│   └── depends on 1. customers - CustomerData
+└── 3. orders - DemoData (skipped)
+```
+
+`--dry-run` runs every builder, `handle()` included, then rolls back all their database changes, so you can check that they work without keeping the data. Failures are still reported. Anything a builder does outside the database, such as writing files or calling an API, isn't undone. It can't be combined with `--wipe`.
+
+`--only` and `--exclude` take an app label (`orders`) or an app label and builder class name (`orders.OrderData`), and can be repeated. `--only` also runs the selected builders' dependencies, and `--exclude` also drops builders that depend on an excluded one. `--exclude` applies after `--only`. Both work with `--list` and `--dry-run`.
 
 `--wipe` uses Django's `flush` command, so it accepts `flush`'s options too, such as `--no-input`.
 
@@ -66,8 +84,41 @@ Widget.objects.using(self.database).get_or_create(name="Sprocket")
 ### How builders run
 
 - The command runs every builder it finds whose `should_run()` returns `True`. By default it always does; override it to limit a builder to certain environments, as in the example above. `should_run()` receives the command's arguments and parsed options (such as `wipe` and `verbosity`), so you can use them as conditions too, for example `return options["wipe"]`.
+- Builders run in the order they're defined in each module. Apps are processed in `INSTALLED_APPS` order, and modules in `HEAVY_WATER_FIXTURE_MODULE` order. Use `depends_on` (below) when a builder needs another one to run first.
 - All builders run in one transaction, and each builder gets its own savepoint. If a builder raises, only its changes are rolled back and the other builders still run.
 - If any builder failed, the command exits with an error listing them after committing the rest.
+
+### Output
+
+The command prints with [Rich](https://rich.readthedocs.io/) via [django-rich](https://github.com/adamchainz/django-rich), including Rich tracebacks for failing builders. Colour follows Django's `--no-color` and `--force-color` flags. Inside a builder, print with `self.console` (stdout) and `self.err_console` (stderr), which accept Rich markup:
+
+```python
+self.console.print(f"Created [bold]{count}[/] widgets")
+```
+
+`self.stdout`, `self.stderr` and `self.style` still work but are deprecated, and raise `heavy_water.HeavyWaterDeprecationWarning` (a `FutureWarning`, which Python shows by default) when used. heavy_water also adds a system check, so you find out before running anything: `manage.py check` (and most other commands) reports `heavy_water.W001` for each builder whose source uses them. Use `self.console`, `self.err_console` and Rich markup instead.
+
+To silence the check, add `"heavy_water.W001"` to `SILENCED_SYSTEM_CHECKS`.
+
+### Dependencies between builders
+
+List the builders a builder relies on in `depends_on`. They run before it, even if they're defined later or in another app:
+
+```python
+from otherapp.fixtures import CustomerData
+
+
+class OrderData(BaseDataBuilder):
+    depends_on = (CustomerData,)
+
+    def handle(self) -> None: ...
+```
+
+- If a dependency fails, the builder doesn't run and is reported as failed too.
+- If a dependency is skipped by its `should_run()`, the builder is skipped too.
+- Each dependency must be a builder the command discovers. A missing dependency or a dependency cycle stops the command before anything runs, including `--wipe`.
+
+Importing a builder into your fixtures module doesn't make it run twice: builders only run from the module that defines them.
 
 ### Creating a superuser
 
@@ -82,7 +133,7 @@ self.get_or_create_superuser(
 )
 ```
 
-> **Warning:** the default password is `rootroot`. Set `HEAVY_WATER_SUPERUSER_PASSWORD` before enabling any builder that creates a superuser outside local development.
+> **Note:** the default password is `rootroot`, and it's only allowed when `DEBUG = True`. With `DEBUG = False`, creating a superuser raises `ImproperlyConfigured` unless you pass `password=` or set `HEAVY_WATER_SUPERUSER_PASSWORD`. Existing users are still returned as normal.
 
 ## Settings
 
@@ -120,6 +171,7 @@ Tasks:
 | `mise run fix` | Applies ruff fixes and formatting, and updates `uv.lock`. |
 | `mise run test` | Runs the test suite with pytest. |
 | `DJANGO=5.2 mise run test-django` | Runs the tests against another Django version. Set `UV_PYTHON` to pick the Python version too. |
+| `mise run demo [options]` | Runs `heavy_water` against the test app, so you can see its output. Options are passed to the command, e.g. `mise run demo --list`. `DEMO_MODULES` picks the test builder modules. |
 | `mise run typecheck` | Runs mypy in strict mode on the package. |
 | `mise run build` | Builds the sdist and wheel into `dist/`. |
 | `mise run bump [major\|minor\|patch]` | Bumps the version (patch by default), commits `pyproject.toml` and `uv.lock`, and tags the commit, e.g. `v0.2.1`. |

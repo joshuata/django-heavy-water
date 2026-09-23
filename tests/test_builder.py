@@ -1,8 +1,4 @@
-from io import StringIO
-
 import pytest
-from django.core.management.base import OutputWrapper
-from django.core.management.color import no_style
 
 from heavy_water import BaseDataBuilder
 from tests.testapp.fixtures import Basic
@@ -15,9 +11,6 @@ pytestmark = pytest.mark.django_db
 def make(builder_class: type[BaseDataBuilder]) -> BaseDataBuilder:
     return builder_class(
         app_name="tests.testapp",
-        stdout=OutputWrapper(StringIO()),
-        stderr=OutputWrapper(StringIO()),
-        style=no_style(),
     )
 
 

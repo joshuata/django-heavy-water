@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
+import sys
+import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser, AbstractUser, UserManager
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.exceptions import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.core.management.base import OutputWrapper
-from django.core.management.color import Style
+from django.core.management.color import Style, color_style
 from django.db import transaction
 from django.db.models import Model
+from rich.console import Console
+from rich.markup import escape
 
-from heavy_water.conf import app_settings
+from heavy_water.conf import DEFAULTS, app_settings
 
 
 def _has_field(model: type[Model], name: str) -> bool:
@@ -28,6 +33,23 @@ def _has_field(model: type[Model], name: str) -> bool:
     return True
 
 
+def _warn_deprecated(name: str, replacement: str) -> None:
+    warnings.warn(
+        f"BaseDataBuilder.{name} is deprecated; use {replacement} instead.",
+        HeavyWaterDeprecationWarning,
+        # Point at the builder code that read the attribute.
+        stacklevel=3,
+    )
+
+
+class HeavyWaterDeprecationWarning(FutureWarning):
+    """A heavy_water feature that will be removed in a future release.
+
+    A ``FutureWarning`` rather than a ``DeprecationWarning`` so that Python shows
+    it by default when builders run under ``manage.py``.
+    """
+
+
 class BaseDataBuilder(ABC):
     """Base class for a unit of seed data.
 
@@ -37,28 +59,55 @@ class BaseDataBuilder(ABC):
 
     Attributes:
         app_name: Name of the app the builder was discovered in.
-        stdout: The command's output stream, for progress messages.
-        stderr: The command's error stream.
-        style: The command's style, for coloring output (``self.style.SUCCESS``).
+        console: A Rich console writing to the command's stdout.
+        err_console: A Rich console writing to the command's stderr.
+        stdout: Deprecated; use ``console``. The command's output stream.
+        stderr: Deprecated; use ``err_console``. The command's error stream.
+        style: Deprecated; use Rich markup with ``console``. The command's style.
         database: Alias of the database to seed: the command's ``--database``, or
             ``HEAVY_WATER_DATABASE``.
             The builder's savepoint and :meth:`get_or_create_superuser` use it;
             queries in :meth:`handle` should too, via ``.using(self.database)``.
+        depends_on: Builder classes that must run before this one. If one of
+            them fails, this builder doesn't run and is reported as failed; if
+            one is skipped, this builder is skipped too. Each must be a builder
+            the command discovers.
     """
+
+    depends_on: ClassVar[Sequence[type[BaseDataBuilder]]] = ()
 
     def __init__(
         self,
         app_name: str,
-        stdout: OutputWrapper,
-        stderr: OutputWrapper,
-        style: Style,
+        stdout: OutputWrapper | None = None,
+        stderr: OutputWrapper | None = None,
+        style: Style | None = None,
         database: str | None = None,
+        console: Console | None = None,
+        err_console: Console | None = None,
     ) -> None:
         self.app_name = app_name
-        self.stdout = stdout
-        self.stderr = stderr
-        self.style = style
+        self._stdout = stdout or OutputWrapper(sys.stdout)
+        self._stderr = stderr or OutputWrapper(sys.stderr)
+        self._style = style or color_style()
         self.database = database or app_settings.DATABASE
+        self.console = console or Console(soft_wrap=True)
+        self.err_console = err_console or Console(stderr=True, soft_wrap=True)
+
+    @property
+    def stdout(self) -> OutputWrapper:
+        _warn_deprecated("stdout", "self.console")
+        return self._stdout
+
+    @property
+    def stderr(self) -> OutputWrapper:
+        _warn_deprecated("stderr", "self.err_console")
+        return self._stderr
+
+    @property
+    def style(self) -> Style:
+        _warn_deprecated("style", "Rich markup with self.console")
+        return self._style
 
     @property
     def builder_name(self) -> str:
@@ -76,23 +125,20 @@ class BaseDataBuilder(ABC):
         Returns:
             ``True`` if the builder ran, ``False`` if it was skipped.
         """
+        name = escape(self.builder_name)
         if not self.should_run(*args, **options):
-            self.stdout.write(f"{self.builder_name}: Skipped")
+            self.console.print(f"[dim]{name}: Skipped[/]")
             return False
         try:
             with transaction.atomic(using=self.database):
                 self.handle()
         except AssertionError:
-            self.stderr.write(
-                self.style.ERROR(
-                    f"{self.builder_name}: Assertion failed setting up data"
-                )
+            self.err_console.print(
+                f"[bold red]{name}: Assertion failed setting up data[/]"
             )
-            self.stderr.write(self.style.ERROR("Rolling back transaction"))
+            self.err_console.print("[red]Rolling back transaction[/]")
             raise
-        self.stdout.write(
-            self.style.SUCCESS(f"{self.builder_name}: Successfully set up data")
-        )
+        self.console.print(f"[green]{name}: Successfully set up data[/]")
         return True
 
     def get_or_create_superuser(
@@ -113,6 +159,10 @@ class BaseDataBuilder(ABC):
         Omitted arguments fall back to the ``HEAVY_WATER_SUPERUSER_*`` settings.
         ``email``, ``first_name``, ``last_name`` and ``password`` are only used
         when the user is created; an existing user is returned unchanged.
+
+        Raises:
+            ImproperlyConfigured: If a user would be created with the default
+                password while ``DEBUG`` is ``False``.
 
         Args:
             username: Value of the login field to look up or create.
@@ -145,10 +195,14 @@ class BaseDataBuilder(ABC):
         try:
             superuser = user_manager.get_by_natural_key(username)
         except user_model.DoesNotExist:
-            fields: dict[str, Any] = {
-                username_field: username,
-                "password": password or app_settings.SUPERUSER_PASSWORD,
-            }
+            password = password or app_settings.SUPERUSER_PASSWORD
+            if password == DEFAULTS["SUPERUSER_PASSWORD"] and not settings.DEBUG:
+                raise ImproperlyConfigured(
+                    "Refusing to create a superuser with the default password "
+                    "while DEBUG is False. Pass password= or set "
+                    "HEAVY_WATER_SUPERUSER_PASSWORD."
+                ) from None
+            fields: dict[str, Any] = {username_field: username, "password": password}
             optional_fields = {
                 email_field: email,
                 "first_name": first_name or app_settings.SUPERUSER_FIRST_NAME,
