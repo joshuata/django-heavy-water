@@ -1,7 +1,6 @@
 import sys
 from typing import Any, Literal
 
-from django.apps import apps
 from django.conf import settings
 from django.core.management.base import CommandError, CommandParser
 from django.core.management.commands.flush import Command as FlushCommand
@@ -13,7 +12,13 @@ from rich.tree import Tree
 
 from heavy_water import BaseDataBuilder
 from heavy_water.conf import app_settings
-from heavy_water.discovery import discover_builders
+from heavy_water.discovery import (
+    BuilderEntry,
+    BuilderSelectionError,
+    discover_builders,
+    order_builders,
+    select_builders,
+)
 
 Result = Literal["ran", "skipped", "failed"]
 
@@ -203,92 +208,20 @@ class Command(RichCommand, FlushCommand):
             return f"skipped, should_run() raised {ex!r}"
         return None
 
-    def _selected_builders(
-        self, **options: Any
-    ) -> list[tuple[str, type[BaseDataBuilder]]]:
+    def _selected_builders(self, **options: Any) -> list[BuilderEntry]:
         """Return the builders to run, in order, after ``--only`` and ``--exclude``."""
-        builders = all_builders = self._order_builders(self._discover_builders())
-        only: list[str] = options.get("only") or []
-        exclude: list[str] = options.get("exclude") or []
-
-        if only:
-            keep: set[type[BaseDataBuilder]] = set()
-            pending = [b for spec in only for b in self._match(spec, all_builders)]
-            while pending:
-                builder = pending.pop()
-                if builder not in keep:
-                    keep.add(builder)
-                    pending.extend(builder.depends_on)
-            builders = [entry for entry in builders if entry[1] in keep]
-
-        if exclude:
-            dropped = {b for spec in exclude for b in self._match(spec, all_builders)}
-            # Dependencies come first in run order, so one pass finds every
-            # builder that depends, directly or not, on an excluded one.
-            for app_name, builder in builders:
-                deps = [dep for dep in builder.depends_on if dep in dropped]
-                if builder not in dropped and deps:
-                    dropped.add(builder)
-                    names = escape(", ".join(dep.__name__ for dep in deps))
-                    self.console.print(
-                        f"[dim]{escape(f'{app_name} - {builder.__name__}')}: "
-                        f"Excluded, it depends on {names}[/]"
-                    )
-            builders = [entry for entry in builders if entry[1] not in dropped]
-
-        return builders
-
-    def _match(
-        self, spec: str, builders: list[tuple[str, type[BaseDataBuilder]]]
-    ) -> list[type[BaseDataBuilder]]:
-        """Return the builders matching ``app_label`` or ``app_label.BuilderName``."""
-        label, _, name = spec.partition(".")
         try:
-            app_name = apps.get_app_config(label).name
-        except LookupError:
-            raise CommandError(
-                f"No installed app with label {label!r} ({spec!r})."
-            ) from None
-        matches = [
-            builder
-            for builder_app, builder in builders
-            if builder_app == app_name and (not name or builder.__name__ == name)
-        ]
-        if not matches:
-            raise CommandError(f"{spec!r} doesn't match any data builders.")
-        return matches
-
-    def _order_builders(
-        self, builders: list[tuple[str, type[BaseDataBuilder]]]
-    ) -> list[tuple[str, type[BaseDataBuilder]]]:
-        """Move each builder's ``depends_on`` ahead of it, otherwise keeping order."""
-        app_names = {builder: app_name for app_name, builder in builders}
-        ordered: list[tuple[str, type[BaseDataBuilder]]] = []
-        visiting: list[type[BaseDataBuilder]] = []
-
-        def visit(builder: type[BaseDataBuilder]) -> None:
-            if builder in visiting:
-                cycle = visiting[visiting.index(builder) :] + [builder]
-                raise CommandError(
-                    "Builder dependency cycle: "
-                    + " -> ".join(dep.__name__ for dep in cycle)
-                )
-            if any(done is builder for _, done in ordered):
-                return
-            visiting.append(builder)
-            for dep in builder.depends_on:
-                if dep not in app_names:
-                    raise CommandError(
-                        f"{builder.__name__} depends on {dep.__module__}.{dep.__name__}, "
-                        "which isn't a discovered builder"
-                    )
-                visit(dep)
-            visiting.pop()
-            ordered.append((app_names[builder], builder))
-
-        for _, builder in builders:
-            visit(builder)
-        return ordered
-
-    def _discover_builders(self) -> list[tuple[str, type[BaseDataBuilder]]]:
-        return discover_builders()
+            selected, dependents = select_builders(
+                order_builders(discover_builders()),
+                only=options.get("only") or [],
+                exclude=options.get("exclude") or [],
+            )
+        except BuilderSelectionError as ex:
+            raise CommandError(str(ex)) from None
+        for app_name, builder, because in dependents:
+            names = escape(", ".join(dep.__name__ for dep in because))
+            self.console.print(
+                f"[dim]{escape(f'{app_name} - {builder.__name__}')}: "
+                f"Excluded, it depends on {names}[/]"
+            )
+        return selected

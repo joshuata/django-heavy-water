@@ -4,7 +4,7 @@ import pytest
 from django.core.management import CommandError, call_command
 from django.test import override_settings
 
-from heavy_water.management.commands.heavy_water import Command
+from heavy_water.discovery import discover_builders, order_builders
 from tests.testapp import fixtures, fixtures_depends
 from tests.testapp.models import Record
 
@@ -19,7 +19,7 @@ def names() -> list[str]:
 
 @override_settings(HEAVY_WATER_FIXTURE_MODULE=MODULES)
 def test_dependencies_run_first() -> None:
-    builders = Command()._order_builders(Command()._discover_builders())
+    builders = order_builders(discover_builders())
 
     assert [builder for _, builder in builders] == [
         fixtures_depends.Parent,

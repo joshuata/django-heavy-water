@@ -5,7 +5,7 @@ import pytest
 from django.core.management import CommandError, call_command
 from django.test import override_settings
 
-from heavy_water.management.commands.heavy_water import Command
+from heavy_water.discovery import discover_builders
 from tests.testapp import fixtures, fixtures_mixed, fixtures_options, fixtures_scope
 from tests.testapp.models import Record
 
@@ -24,20 +24,18 @@ def record_names() -> set[str]:
 
 class TestDiscovery:
     def test_finds_builders_in_default_module(self) -> None:
-        assert Command()._discover_builders() == [("tests.testapp", fixtures.Basic)]
+        assert discover_builders() == [("tests.testapp", fixtures.Basic)]
 
     @override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures", "fixtures_options"])
     def test_searches_every_configured_module(self) -> None:
-        assert Command()._discover_builders() == [
+        assert discover_builders() == [
             ("tests.testapp", fixtures.Basic),
             ("tests.testapp", fixtures_options.WipeOnly),
         ]
 
     @override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures_scope"])
     def test_ignores_imported_and_abstract_builders(self) -> None:
-        assert Command()._discover_builders() == [
-            ("tests.testapp", fixtures_scope.UsesSharedBase)
-        ]
+        assert discover_builders() == [("tests.testapp", fixtures_scope.UsesSharedBase)]
 
     @override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures", "fixtures_scope"])
     def test_imported_builder_runs_once(self) -> None:
@@ -50,11 +48,11 @@ class TestDiscovery:
 
     @override_settings(HEAVY_WATER_FIXTURE_MODULE=["does_not_exist"])
     def test_skips_apps_without_the_module(self) -> None:
-        assert Command()._discover_builders() == []
+        assert discover_builders() == []
 
     @override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures_mixed"])
     def test_returns_builders_in_definition_order(self) -> None:
-        builders = [builder for _, builder in Command()._discover_builders()]
+        builders = [builder for _, builder in discover_builders()]
         assert builders == [
             fixtures_mixed.Succeeds,
             fixtures_mixed.FailsAssertion,
