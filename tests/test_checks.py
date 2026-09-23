@@ -2,7 +2,8 @@ from django.apps import apps
 from django.core import checks
 from django.test import override_settings
 
-from heavy_water.checks import check_deprecated_output
+from heavy_water import BaseDataBuilder
+from heavy_water.checks import _deprecated_uses, check_deprecated_output
 from tests.testapp import fixtures_deprecated
 
 
@@ -45,3 +46,10 @@ def test_is_registered_with_django() -> None:
     ids = {message.id for message in checks.run_checks()}
 
     assert "heavy_water.W001" in ids
+
+
+def test_classes_without_source_are_skipped() -> None:
+    # Created at run time, so inspect.getsource() can't find its source.
+    dynamic = type("Dynamic", (BaseDataBuilder,), {"handle": lambda self: None})
+
+    assert _deprecated_uses(dynamic) == []

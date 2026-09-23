@@ -4,7 +4,13 @@ All notable changes to django-heavy-water. The format follows [Keep a Changelog]
 
 ## Unreleased
 
+### Fixed
+
+- `--list` wraps long lines instead of cutting them off at the terminal width, which could hide why a builder is skipped.
+
 ### Changed
+
+- Development only: CI measures test coverage (100% of lines and branches, enforced), uploads it to Codecov, and type-checks the tests. Test results appear on each CI job's summary page, and mypy errors are annotated on pull requests.
 
 - Development only: GitHub Actions are pinned to commit SHAs (checked by pinact in `mise run lint`), and Renovate keeps actions, tools and dependencies up to date.
 

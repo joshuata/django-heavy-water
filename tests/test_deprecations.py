@@ -39,10 +39,14 @@ def test_old_output_attributes_warn(
     assert record[0].filename == __file__
 
 
-def test_old_output_attributes_still_work(builder: Basic) -> None:
+def test_old_output_attributes_still_work() -> None:
+    stream = StringIO()
+    builder = Basic(app_name="tests.testapp", stdout=OutputWrapper(stream))
+
     with pytest.warns(HeavyWaterDeprecationWarning):
         builder.stdout.write("still works")
-        assert builder.stdout._out.getvalue() == "still works\n"
+
+    assert stream.getvalue() == "still works\n"
 
 
 def test_passing_old_output_arguments_does_not_warn(builder: Basic) -> None:

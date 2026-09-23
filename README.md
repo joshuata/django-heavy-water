@@ -3,6 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/django-heavy-water)](https://pypi.org/project/django-heavy-water/)
 [![Python versions](https://img.shields.io/pypi/pyversions/django-heavy-water)](https://pypi.org/project/django-heavy-water/)
 [![CI](https://github.com/joshuata/django-heavy-water/actions/workflows/ci.yml/badge.svg)](https://github.com/joshuata/django-heavy-water/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/joshuata/django-heavy-water/graph/badge.svg)](https://codecov.io/gh/joshuata/django-heavy-water)
 
 A reusable Django app that seeds your database with development and test data. Each app in your project defines *data builders*, and a single management command, `heavy_water`, runs the ones that apply to the current environment.
 
@@ -188,9 +189,10 @@ Tasks:
 | `mise run lint` | Syncs `.venv`, then runs all checks: ruff lint, ruff format, mypy and `uv lock --check`. The pre-commit hook runs the same checks. |
 | `mise run fix` | Applies ruff fixes and formatting, and updates `uv.lock`. |
 | `mise run test` | Runs the test suite with pytest. |
+| `mise run coverage` | Runs the tests with line and branch coverage, writes `coverage.xml`, and fails below 100%. |
 | `DJANGO=5.2 mise run test-django` | Runs the tests against another Django version. Set `UV_PYTHON` to pick the Python version too. |
 | `mise run demo [options]` | Runs `heavy_water` against the test app, so you can see its output. Options are passed to the command, e.g. `mise run demo --list`. `DEMO_MODULES` picks the test builder modules. |
-| `mise run typecheck` | Runs mypy in strict mode on the package. |
+| `mise run typecheck` | Runs mypy in strict mode on the package and the tests. |
 | `mise run build` | Builds the sdist and wheel into `dist/`. |
 | `mise run bump [major\|minor\|patch]` | Bumps the version (patch by default), dates the changelog's Unreleased section, commits `pyproject.toml`, `uv.lock` and `CHANGELOG.md`, and tags the commit, e.g. `v0.2.1`. |
 | `mise run publish` | Uploads `dist/` to PyPI. Normally run by the publish workflow, not by hand. |
@@ -213,7 +215,7 @@ GitHub Actions in `.github/workflows/` are pinned to full commit SHAs, with the 
 
 GitHub Actions (`.github/workflows/`) runs everything through the same mise tasks:
 
-- **CI** (`ci.yml`), on pushes to `main` and on pull requests: `lint` and `build`, then `test-django` across supported Python and Django versions.
+- **CI** (`ci.yml`), on pushes to `main` and on pull requests: `lint`, `coverage` (whose table appears on the run's summary page, and whose `coverage.xml` is uploaded to [Codecov](https://codecov.io/gh/joshuata/django-heavy-water) using OIDC, so no token is stored) and `build`, then `test-django` across supported Python and Django versions. Each job's summary page shows a table of test results, and mypy errors appear as annotations on the offending lines in pull requests.
 - **Publish** (`publish.yml`), when a GitHub release is published: checks the release tag matches the version in `pyproject.toml` (`v0.3.0` or `0.3.0` for version `0.3.0`), runs lint, tests and build, then uploads to PyPI with trusted publishing.
 
 To release:
@@ -223,7 +225,7 @@ To release:
 3. Run `mise run bump` (or `bump minor` / `bump major`). It bumps the version, moves the Unreleased changes under a dated heading for the new version, commits, and tags.
 4. Push with `git push --follow-tags`, and publish a GitHub release from the new tag.
 
-The package ships a `py.typed` marker and is checked with mypy in strict mode, so new code must be fully type-annotated.
+The package ships a `py.typed` marker and is checked with mypy in strict mode, tests included (using the django-stubs mypy plugin with the test settings), so new code must be fully type-annotated. Every line and branch of the package is covered by tests, and CI keeps it that way.
 
 ## License
 

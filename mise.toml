@@ -47,6 +47,15 @@ run = "hk fix --all"
 description = "Run the test suite"
 run = "uv run pytest"
 
+[tasks.coverage]
+description = "Run the tests with line and branch coverage, failing below 100%"
+run = [
+  "uv run coverage run -m pytest",
+  # coverage.xml is what CI uploads to Codecov.
+  "uv run coverage xml --fail-under=0 --quiet",
+  "uv run coverage report",
+]
+
 [tasks.test-django]
 description = "Run the tests against another Django version: DJANGO=5.2 mise run test-django"
 run = [

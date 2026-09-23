@@ -187,7 +187,8 @@ class Command(RichCommand, FlushCommand):
             node = tree.add(label)
             for dep in builder.depends_on:
                 node.add(f"[dim]depends on[/] {labels[dep]}")
-        self.console.print(tree)
+        # Wrap long labels rather than cropping them at the console width.
+        self.console.print(tree, soft_wrap=False)
 
     def _list_note(
         self,

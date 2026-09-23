@@ -61,3 +61,14 @@ def test_does_not_run_or_wipe_anything() -> None:
 @override_settings(HEAVY_WATER_FIXTURE_MODULE=["does_not_exist"])
 def test_reports_when_there_are_no_builders() -> None:
     assert list_builders() == "No data builders found.\n"
+
+
+@override_settings(HEAVY_WATER_FIXTURE_MODULE=["fixtures_should_run_error"])
+def test_should_run_errors_are_shown_as_skipped() -> None:
+    # Long labels wrap instead of being cropped, so compare without line breaks.
+    output = " ".join(list_builders().split())
+
+    assert (
+        "1. tests.testapp - ShouldRunRaises "
+        "(skipped, should_run() raised ValueError('boom'))" in output
+    )

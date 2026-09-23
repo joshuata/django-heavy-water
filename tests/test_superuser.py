@@ -3,10 +3,12 @@ from typing import Any
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
 from tests.testapp.fixtures import Basic
+from tests.testapp.models import EmailUser
 
 pytestmark = pytest.mark.django_db
 
@@ -28,6 +30,7 @@ class TestDefaultUserModel:
     def test_creates_superuser_from_defaults(self, builder: Basic) -> None:
         user = builder.get_or_create_superuser()
 
+        assert isinstance(user, User)
         assert user.get_username() == "root"
         assert user.email == "root@example.com"
         assert user.first_name == "Root"
@@ -45,6 +48,7 @@ class TestDefaultUserModel:
             password="s3cret",
         )
 
+        assert isinstance(user, User)
         assert user.get_username() == "admin"
         assert user.email == "admin@example.com"
         assert (user.first_name, user.last_name) == ("Ada", "Admin")
@@ -65,6 +69,7 @@ class TestDefaultUserModel:
 
         second = builder.get_or_create_superuser(email="other@example.com")
 
+        assert isinstance(second, User)
         assert second.pk == first.pk
         assert second.email == "root@example.com"
         assert get_user_model().objects.count() == 1
@@ -73,11 +78,13 @@ class TestDefaultUserModel:
         builder.get_or_create_superuser()
 
         def rename(user: AbstractBaseUser) -> None:
+            assert isinstance(user, User)
             user.first_name = "Renamed"
 
         user = builder.get_or_create_superuser(configure_user=rename)
         user.refresh_from_db()
 
+        assert isinstance(user, User)
         assert user.first_name == "Renamed"
 
 
@@ -149,7 +156,7 @@ class TestEmailUserModel:
     def test_uses_email_as_the_identifier(self, builder: Basic) -> None:
         user = builder.get_or_create_superuser()
 
-        assert type(user).__name__ == "EmailUser"
+        assert isinstance(user, EmailUser)
         assert user.get_username() == "root@example.com"
         assert user.is_superuser
         assert user.check_password("rootroot")

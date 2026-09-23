@@ -183,7 +183,7 @@ class BaseDataBuilder(ABC):
             "UserManager[AbstractUser]",
             user_model._default_manager.db_manager(self.database),
         )
-        username_field = cast(str, user_model.USERNAME_FIELD)
+        username_field = user_model.USERNAME_FIELD
         email_field = user_model.get_email_field_name()
 
         email = email or app_settings.SUPERUSER_EMAIL

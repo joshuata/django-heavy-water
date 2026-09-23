@@ -18,13 +18,43 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets the Codecov upload authenticate with OIDC instead of a stored token.
+      id-token: write
     env:
       # pinact (in lint) checks the pinned action SHAs against GitHub's API.
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - name: Annotate mypy errors on the offending lines
+        run: echo "::add-matcher::.github/matchers/mypy.json"
       - run: mise run lint
+      - run: mise run coverage
+        env:
+          PYTEST_MD_REPORT: "true"
+          PYTEST_MD_REPORT_OUTPUT: ${{ runner.temp }}/pytest-report.md
+      - name: Add test results and coverage to the job summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "### Tests"
+            cat "$RUNNER_TEMP/pytest-report.md" 2>/dev/null || echo "No test report."
+            echo
+            echo "### Coverage"
+            mise x -- coverage report --format=markdown --fail-under=0 2>/dev/null || echo "No coverage data."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage to Codecov
+        # Upload even when coverage fell below 100%, so the drop shows up there.
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: coverage.xml
+          disable_search: true
+          use_oidc: true
+          # Pull requests from forks can't get an OIDC token, so don't fail those.
+          fail_ci_if_error: ${{ github.event.pull_request.head.repo.fork != true }}
       - run: mise run build
 
   test:
@@ -51,3 +81,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
       - run: mise run test-django
+        env:
+          PYTEST_MD_REPORT: "true"
+          PYTEST_MD_REPORT_OUTPUT: ${{ runner.temp }}/pytest-report.md
+      - name: Add test results to the job summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "### Tests: Python ${{ matrix.python }}, Django ${{ matrix.django }}"
+            cat "$RUNNER_TEMP/pytest-report.md" 2>/dev/null || echo "No test report."
+          } >> "$GITHUB_STEP_SUMMARY"

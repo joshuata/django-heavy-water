@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.db import models
@@ -13,7 +13,14 @@ class Record(models.Model):
         return self.name
 
 
-class EmailUserManager(BaseUserManager):
+if TYPE_CHECKING:
+    # BaseUserManager is only generic in django-stubs, not at run time.
+    _EmailUserManagerBase = BaseUserManager["EmailUser"]
+else:
+    _EmailUserManagerBase = BaseUserManager
+
+
+class EmailUserManager(_EmailUserManagerBase):
     def create_superuser(
         self, email: str, password: str | None = None, **extra_fields: Any
     ) -> "EmailUser":
