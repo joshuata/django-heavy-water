@@ -4,6 +4,8 @@ All notable changes to django-heavy-water. The format follows [Keep a Changelog]
 
 ## Unreleased
 
+## 0.3.0 - 2026-09-23
+
 ### Upgrading from 0.2.2
 
 - **Builders only run when `DEBUG` is `True` by default.** `BaseDataBuilder.should_run()` now returns `settings.DEBUG` instead of `True`, so seed data doesn't reach staging or production by accident. For a builder that should run everywhere, override `should_run()` to `return True`. Builders that already override `should_run()` are unaffected. Run `manage.py heavy_water --list` in each environment to check what will run.

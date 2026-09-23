@@ -1,6 +1,6 @@
 [project]
 name = "django-heavy-water"
-version = "0.2.2"
+version = "0.3.0"
 description = "Seed Django databases with development and test data using per-app data builders"
 authors = [{ name = "Josh Asplund", email = "joshasplund@gmail.com" }]
 license = "BSD-3-Clause"
