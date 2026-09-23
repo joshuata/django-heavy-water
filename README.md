@@ -175,10 +175,16 @@ Tasks:
 | `mise run demo [options]` | Runs `heavy_water` against the test app, so you can see its output. Options are passed to the command, e.g. `mise run demo --list`. `DEMO_MODULES` picks the test builder modules. |
 | `mise run typecheck` | Runs mypy in strict mode on the package. |
 | `mise run build` | Builds the sdist and wheel into `dist/`. |
-| `mise run bump [major\|minor\|patch]` | Bumps the version (patch by default), commits `pyproject.toml` and `uv.lock`, and tags the commit, e.g. `v0.2.1`. |
+| `mise run bump [major\|minor\|patch]` | Bumps the version (patch by default), dates the changelog's Unreleased section, commits `pyproject.toml`, `uv.lock` and `CHANGELOG.md`, and tags the commit, e.g. `v0.2.1`. |
 | `mise run publish` | Uploads `dist/` to PyPI. Normally run by the publish workflow, not by hand. |
 
 Run `mise tasks` to list them. To add a script, define it as a task in `mise.toml`.
+
+### Commit messages
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `<type>[(scope)][!]: <summary>`, for example `feat(command): add --only and --exclude flags` or `fix!: refuse the default password when DEBUG is False`. The types are `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore` and `revert`; add `!` for breaking changes.
+
+The git hooks installed by `mise install` (or `mise run hooks`) enforce this: a `commit-msg` hook rejects other messages, and when git opens your editor, a `prepare-commit-msg` hook adds a short guide as comments. Git's own merge and revert messages are allowed. If you set up hooks before this was added, run `mise run hooks` again.
 
 ### CI and releases
 
@@ -187,7 +193,11 @@ GitHub Actions (`.github/workflows/`) runs everything through the same mise task
 - **CI** (`ci.yml`), on pushes to `main` and on pull requests: `lint` and `build`, then `test-django` across supported Python and Django versions.
 - **Publish** (`publish.yml`), when a GitHub release is published: checks the release tag matches the version in `pyproject.toml` (`v0.3.0` or `0.3.0` for version `0.3.0`), runs lint, tests and build, then uploads to PyPI with trusted publishing.
 
-To release, run `mise run bump` (or `bump minor` / `bump major`), push with `git push --follow-tags`, and publish a GitHub release from the new tag.
+To release:
+
+1. Make sure [CHANGELOG.md](CHANGELOG.md) lists the changes under `## Unreleased`, including upgrade notes for anything that breaks existing projects.
+2. Run `mise run bump` (or `bump minor` / `bump major`). It bumps the version, moves the Unreleased changes under a dated heading for the new version, commits, and tags.
+3. Push with `git push --follow-tags`, and publish a GitHub release from the new tag.
 
 The package ships a `py.typed` marker and is checked with mypy in strict mode, so new code must be fully type-annotated.
 

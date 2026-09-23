@@ -38,6 +38,7 @@ classifiers = [
 Homepage = "https://github.com/joshuata/django-heavy-water"
 Repository = "https://github.com/joshuata/django-heavy-water"
 Issues = "https://github.com/joshuata/django-heavy-water/issues"
+Changelog = "https://github.com/joshuata/django-heavy-water/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [

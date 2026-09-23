@@ -11,3 +11,41 @@ steps {
     fix = "uv lock"
   }
 }
+
+hooks {
+  // Adds a Conventional Commits guide, as comments, when the editor opens for a new
+  // message (not for -m, -F, merges, squashes or amends, where git sets `source`).
+  ["prepare-commit-msg"] {
+    steps {
+      ["commit-guide"] {
+        check = """
+          [ -n "{{source}}" ] && exit 0
+          guide='# Conventional Commits: <type>[(scope)][!]: <summary>
+          #   types: feat fix docs refactor perf test build ci chore revert
+          #   e.g.   feat(command): add --only and --exclude flags
+          #          fix!: refuse the default password when DEBUG is False
+          #   Add ! (or a "BREAKING CHANGE:" footer) for breaking changes.'
+          { head -n 1 "{{commit_msg_file}}"; echo "$guide" | sed 's/^ *//'; tail -n +2 "{{commit_msg_file}}"; } > "{{commit_msg_file}}.hk"
+          mv "{{commit_msg_file}}.hk" "{{commit_msg_file}}"
+          """
+      }
+    }
+  }
+  // Rejects messages that aren't Conventional Commits. Git's own merge and revert
+  // messages are allowed through.
+  ["commit-msg"] {
+    steps {
+      ["conventional-commit"] {
+        check = """
+          subject="$(grep -v '^#' "{{commit_msg_file}}" | head -n 1)"
+          case "$subject" in "Merge "*|"Revert \""*) exit 0 ;; esac
+          hk util check-conventional-commit "{{commit_msg_file}}" || {
+            echo 'Use Conventional Commits: <type>[(scope)][!]: <summary>, e.g. "feat: add --list flag".' >&2
+            echo 'Types: feat fix docs refactor perf test build ci chore revert. See https://www.conventionalcommits.org' >&2
+            exit 1
+          }
+          """
+      }
+    }
+  }
+}

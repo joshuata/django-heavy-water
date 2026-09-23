@@ -70,7 +70,7 @@ description = "Upload dist/ to PyPI (uses trusted publishing in GitHub Actions)"
 run = "uv publish"
 
 [tasks.bump]
-description = "Bump the version, commit pyproject.toml and uv.lock, and tag the commit: mise run bump [major|minor|patch]"
+description = "Bump the version, date the changelog, commit, and tag: mise run bump [major|minor|patch]"
 usage = 'arg "[part]" help="Which part of the version to bump" default="patch" { choices "major" "minor" "patch" }'
 run = '''
 #!/usr/bin/env bash
@@ -78,8 +78,12 @@ set -euo pipefail
 
 part="${usage_part:-patch}"
 
-if ! git diff --quiet HEAD -- pyproject.toml uv.lock; then
-  echo "pyproject.toml or uv.lock has uncommitted changes; commit or stash them first." >&2
+if ! git diff --quiet HEAD -- pyproject.toml uv.lock CHANGELOG.md; then
+  echo "pyproject.toml, uv.lock or CHANGELOG.md has uncommitted changes; commit or stash them first." >&2
+  exit 1
+fi
+if ! grep -qx "## Unreleased" CHANGELOG.md; then
+  echo "CHANGELOG.md has no '## Unreleased' section to release." >&2
   exit 1
 fi
 
@@ -91,7 +95,12 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
 fi
 
 uv version --bump "$part"
-git commit -m "Bump version to $version" -- pyproject.toml uv.lock
+# Keep an empty Unreleased section, and put this release's changes under it.
+awk -v heading="## $version - $(date +%F)" '
+  { print }
+  $0 == "## Unreleased" && !done { print ""; print heading; done = 1 }
+' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+git commit -m "chore: bump version to $version" -- pyproject.toml uv.lock CHANGELOG.md
 git tag -a "$tag" -m "$tag"
 echo "Tagged $tag. Push with: git push --follow-tags"
 '''
