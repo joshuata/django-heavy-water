@@ -6,7 +6,10 @@ authors = [{ name = "Josh Asplund", email = "joshasplund@gmail.com" }]
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["Django>=4.2"]
+dependencies = [
+    "Django>=4.2",
+    "django-rich>=2.2.0",
+]
 keywords = ["django", "fixtures", "seed", "test data", "management command"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -62,6 +65,8 @@ ignore = ["E501", "TD003"]
 DJANGO_SETTINGS_MODULE = "tests.settings"
 pythonpath = ["."]
 testpaths = ["tests"]
+# Our own code must never use deprecated builder attributes.
+filterwarnings = ["error::heavy_water.HeavyWaterDeprecationWarning"]
 
 [tool.mypy]
 files = ["src"]

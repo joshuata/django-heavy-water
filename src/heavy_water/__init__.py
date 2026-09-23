@@ -1,3 +1,3 @@
-from .fixtures import BaseDataBuilder
+from .fixtures import BaseDataBuilder, HeavyWaterDeprecationWarning
 
-__all__ = ["BaseDataBuilder"]
+__all__ = ["BaseDataBuilder", "HeavyWaterDeprecationWarning"]

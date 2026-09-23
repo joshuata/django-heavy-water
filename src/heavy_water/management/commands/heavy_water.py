@@ -1,22 +1,23 @@
-from importlib import import_module
-from inspect import isabstract, isclass
-from traceback import format_exception
+import sys
 from typing import Any, Literal
 
-from django.apps import apps
 from django.conf import settings
 from django.core.management.base import CommandError, CommandParser
 from django.core.management.commands.flush import Command as FlushCommand
 from django.db import transaction
-from django.utils.module_loading import module_has_submodule
+from django_rich.management import RichCommand
+from rich.console import Console
+from rich.markup import escape
+from rich.tree import Tree
 
 from heavy_water import BaseDataBuilder
 from heavy_water.conf import app_settings
+from heavy_water.discovery import discover_builders
 
 Result = Literal["ran", "skipped", "failed"]
 
 
-class Command(FlushCommand):
+class Command(RichCommand, FlushCommand):
     help = "Runs the data builders for the current environment"
     requires_migrations_checks = True
 
@@ -26,6 +27,11 @@ class Command(FlushCommand):
             "--wipe",
             action="store_true",
             help="Flush the database before running the builders.",
+        )
+        parser.add_argument(
+            "--list",
+            action="store_true",
+            help="List the builders in the order they would run, without running them.",
         )
         # None means "not given", so HEAVY_WATER_DATABASE can apply. flush's help
         # text for --database would otherwise claim it defaults to "default".
@@ -37,7 +43,19 @@ class Command(FlushCommand):
                     'Defaults to HEAVY_WATER_DATABASE, or the "default" database.'
                 )
 
+    def make_rich_console(self, **kwargs: Any) -> Console:
+        # Keep status lines whole instead of wrapping them at the console width.
+        return super().make_rich_console(**kwargs, soft_wrap=True)
+
     def handle(self, *args: Any, **options: Any) -> None:
+        # RichCommand only sets up stdout; mirror it for stderr.
+        force_terminal = (
+            False if options["no_color"] else True if options["force_color"] else None
+        )
+        self.err_console = self.make_rich_console(
+            file=options.get("stderr") or sys.stderr,
+            force_terminal=force_terminal,
+        )
         # Commit whatever succeeded before reporting failure, so a single bad
         # builder doesn't roll back the others.
         database = options.get("database") or app_settings.DATABASE
@@ -46,6 +64,9 @@ class Command(FlushCommand):
                 f"Unknown database {database!r}; expected one of {sorted(settings.DATABASES)}"
             )
         options["database"] = database
+        if options["list"]:
+            self._list(*args, **options)
+            return
         with transaction.atomic(using=database):
             failures = self._build(*args, **options)
         if failures:
@@ -81,28 +102,77 @@ class Command(FlushCommand):
     ) -> Result:
         unmet = [dep for dep in builder.depends_on if results[dep] != "ran"]
         if unmet:
-            deps = ", ".join(dep.__name__ for dep in unmet)
+            deps = escape(", ".join(dep.__name__ for dep in unmet))
             if any(results[dep] == "failed" for dep in unmet):
-                self.stderr.write(
-                    self.style.ERROR(f"{name}: Not run, a dependency failed ({deps})")
+                self.err_console.print(
+                    f"[bold red]{escape(name)}: Not run, a dependency failed ({deps})[/]"
                 )
                 return "failed"
-            self.stdout.write(f"{name}: Skipped, a dependency was skipped ({deps})")
+            self.console.print(
+                f"[dim]{escape(name)}: Skipped, a dependency was skipped ({deps})[/]"
+            )
             return "skipped"
 
         try:
-            obj = builder(
-                app_name=app_name,
-                stdout=self.stdout,
-                stderr=self.stderr,
-                style=self.style,
-                database=options["database"],
-            )
+            obj = self._make_builder(app_name, builder, options["database"])
             return "ran" if obj._heavy_water(*args, **options) else "skipped"
-        except Exception as ex:
-            output = "".join(format_exception(ex))
-            self.stderr.write(self.style.ERROR_OUTPUT(output))
+        except Exception:
+            self.err_console.print_exception()
             return "failed"
+
+    def _make_builder(
+        self, app_name: str, builder: type[BaseDataBuilder], database: str
+    ) -> BaseDataBuilder:
+        return builder(
+            app_name=app_name,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            style=self.style,
+            database=database,
+            console=self.console,
+            err_console=self.err_console,
+        )
+
+    def _list(self, *args: Any, **options: Any) -> None:
+        """Print the builders as a tree in run order, with their dependencies."""
+        builders = self._order_builders(self._discover_builders())
+        if not builders:
+            self.console.print("No data builders found.")
+            return
+
+        labels: dict[type[BaseDataBuilder], str] = {}
+        skipped: set[type[BaseDataBuilder]] = set()
+        tree = Tree("[bold]Data builders[/], in run order")
+        for index, (app_name, builder) in enumerate(builders, start=1):
+            label = f"{index}. {escape(f'{app_name} - {builder.__name__}')}"
+            note = self._list_note(app_name, builder, skipped, *args, **options)
+            if note is not None:
+                skipped.add(builder)
+                label = f"[dim]{label} ({escape(note)})[/]"
+            labels[builder] = label
+            node = tree.add(label)
+            for dep in builder.depends_on:
+                node.add(f"[dim]depends on[/] {labels[dep]}")
+        self.console.print(tree)
+
+    def _list_note(
+        self,
+        app_name: str,
+        builder: type[BaseDataBuilder],
+        skipped: set[type[BaseDataBuilder]],
+        *args: Any,
+        **options: Any,
+    ) -> str | None:
+        """Return why ``builder`` would be skipped, or ``None`` if it would run."""
+        if any(dep in skipped for dep in builder.depends_on):
+            return "skipped, a dependency is skipped"
+        try:
+            obj = self._make_builder(app_name, builder, options["database"])
+            if not obj.should_run(*args, **options):
+                return "skipped"
+        except Exception as ex:
+            return f"skipped, should_run() raised {ex!r}"
+        return None
 
     def _order_builders(
         self, builders: list[tuple[str, type[BaseDataBuilder]]]
@@ -137,23 +207,4 @@ class Command(FlushCommand):
         return ordered
 
     def _discover_builders(self) -> list[tuple[str, type[BaseDataBuilder]]]:
-        data_builders: list[tuple[str, type[BaseDataBuilder]]] = []
-        for app in apps.get_app_configs():
-            for module_name in app_settings.FIXTURE_MODULE:
-                if not module_has_submodule(app.module, module_name):
-                    continue
-                module = import_module(f"{app.name}.{module_name}")
-                # vars() keeps definition order, so builders run in the order written.
-                for member in vars(module).values():
-                    # Only concrete builders defined here: imported builders run
-                    # from their own module, and abstract bases (including
-                    # BaseDataBuilder) can't be instantiated.
-                    if (
-                        isclass(member)
-                        and issubclass(member, BaseDataBuilder)
-                        and member.__module__ == module.__name__
-                        and not isabstract(member)
-                    ):
-                        data_builders.append((app.name, member))
-
-        return data_builders
+        return discover_builders()

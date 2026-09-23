@@ -1,12 +1,9 @@
-from io import StringIO
 from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.core.exceptions import ImproperlyConfigured
-from django.core.management.base import OutputWrapper
-from django.core.management.color import no_style
 from django.test import override_settings
 
 from tests.testapp.fixtures import Basic
@@ -24,9 +21,6 @@ def debug(settings: Any) -> None:
 def builder() -> Basic:
     return Basic(
         app_name="tests.testapp",
-        stdout=OutputWrapper(StringIO()),
-        stderr=OutputWrapper(StringIO()),
-        style=no_style(),
     )
 
 
@@ -91,9 +85,6 @@ class TestDefaultUserModel:
 def test_uses_the_builders_database() -> None:
     builder = Basic(
         app_name="tests.testapp",
-        stdout=OutputWrapper(StringIO()),
-        stderr=OutputWrapper(StringIO()),
-        style=no_style(),
         database="other",
     )
 
@@ -113,9 +104,6 @@ def test_builder_database_defaults_to_the_setting(
     settings.HEAVY_WATER_DATABASE = "other"
     fresh = Basic(
         app_name="tests.testapp",
-        stdout=OutputWrapper(StringIO()),
-        stderr=OutputWrapper(StringIO()),
-        style=no_style(),
     )
 
     assert builder.database == "default"

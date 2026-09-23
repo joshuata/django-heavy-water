@@ -47,6 +47,10 @@ run = [
   "uv run --no-sync pytest",
 ]
 
+[tasks.demo]
+description = "Run heavy_water against the test app to see its output (args are passed through, e.g. --list)"
+run = "uv run python -m tests.demo"
+
 [tasks.typecheck]
 description = "Type check with mypy"
 run = "uv run mypy"
